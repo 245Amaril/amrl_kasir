@@ -48,7 +48,7 @@ function handle_image_upload($file_input_name, $current_image = '') {
 }
 
 // --- Penanganan Aksi dari Form (POST Request) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     switch ($action) {
         case 'login':
@@ -208,7 +208,7 @@ switch ($page) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kasir POS - <?php echo ucfirst($page); ?></title>
+    <title>Kasir - <?php echo ucfirst($page); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -226,6 +226,45 @@ switch ($page) {
         .form-container { max-width: 450px; margin: 5rem auto; }
         .offcanvas-body { display: flex; flex-direction: column; }
         .cart-items { flex-grow: 1; }
+
+        /* Sidebar styles */
+        .sidebar {
+            min-height: 100vh;
+            width: 240px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1040;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar .sidebar-header {
+            border-bottom: 1px solid #eee;
+        }
+        .sidebar .nav-link.active, .sidebar .nav-link:hover {
+            background: #f0f4ff;
+            color: #0d6efd !important;
+        }
+        .sidebar .nav-link {
+            border-radius: 0.5rem;
+            margin-bottom: 0.2rem;
+            transition: background 0.15s, color 0.15s;
+        }
+        .sidebar .nav-link {
+            color: #222;
+        }
+        .sidebar .nav-link i {
+            min-width: 1.2em;
+        }
+        .sidebar .mt-auto {
+            margin-top: auto !important;
+        }
+        @media (max-width: 991.98px) {
+            .sidebar { position: static; width: 100%; min-height: auto; }
+            .main-content { margin-left: 0 !important; }
+        }
 
         .floating-alert {
             position: fixed;
@@ -248,45 +287,77 @@ switch ($page) {
             .print-area { position: absolute; left: 0; top: 0; width: 100%; }
             .no-print { display: none !important; }
         }
+
+        /* Mobile dropdown menu hover/active color fix */
+        @media (max-width: 767.98px) {
+            .dropdown-menu .dropdown-item:active,
+            .dropdown-menu .dropdown-item.active,
+            .dropdown-menu .dropdown-item:hover {
+                background-color: #e9f2ff !important;
+                color: #0d6efd !important;
+            }
+            .dropdown-menu .dropdown-item {
+                transition: background 0.15s, color 0.15s;
+            }
+        }
     </style>
 </head>
 <body>
 
     <?php if (isset($_SESSION['user_id'])): ?>
-    <!-- Navbar Utama -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top no-print shadow-sm">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold text-primary" href="index.php?page=home"><i class="bi bi-shop-window"></i> POS KASIR</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item"><a class="nav-link <?php echo $page == 'home' ? 'active' : ''; ?>" href="index.php?page=home">Home</a></li>
-                    <?php if ($_SESSION['role'] === 'admin'): ?>
-                        <li class="nav-item"><a class="nav-link <?php echo $page == 'produk' ? 'active' : ''; ?>" href="index.php?page=produk">Manajemen Produk</a></li>
-                        <li class="nav-item"><a class="nav-link <?php echo $page == 'statistik' ? 'active' : ''; ?>" href="index.php?page=statistik">Statistik</a></li>
-                    <?php elseif ($_SESSION['role'] === 'kasir'): ?>
-                        <li class="nav-item"><a class="nav-link <?php echo $page == 'statistik' ? 'active' : ''; ?>" href="index.php?page=statistik">Statistik</a></li>
-                    <?php endif; ?>
-                    <li class="nav-item"><a class="nav-link <?php echo $page == 'riwayat' ? 'active' : ''; ?>" href="index.php?page=riwayat">Riwayat Pesanan</a></li>
-                </ul>
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-primary me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCart">
-                        <i class="bi bi-cart-fill"></i> Keranjang <span class="badge bg-danger ms-1" id="cart-count">0</span>
-                    </button>
-                    <div class="vr"></div>
-                    <span class="navbar-text mx-3">
-                        <i class="bi bi-person-circle me-1"></i> <?php echo htmlspecialchars($_SESSION['username']); ?>
-                    </span>
-                    <a href="index.php?page=logout" class="btn btn-outline-danger"><i class="bi bi-box-arrow-right"></i></a>
-                </div>
+    <!-- Navbar Utama di Atas -->
+    <nav class="navbar navbar-light bg-white shadow-sm px-3 py-2 d-flex align-items-center justify-content-between flex-wrap no-print" style="position:sticky;top:0;z-index:2102;min-height:56px;">
+        <a class="navbar-brand fw-bold text-primary d-flex align-items-center m-0 me-4" href="index.php?page=home" style="font-size: 1.3rem;"><i class="bi bi-shop-window me-2"></i> KEDAI BIASANE</a>
+        <!-- Desktop menu -->
+        <div class="d-none d-md-flex align-items-center flex-grow-1 flex-wrap" style="min-width:0;">
+            <ul class="navbar-nav flex-row flex-wrap ms-2">
+                <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'home' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=home"><i class="bi bi-house-door me-2"></i> Home</a></li>
+                <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'produk' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=produk"><i class="bi bi-box-seam me-2"></i> Manajemen Produk</a></li>
+                    <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
+                <?php elseif ($_SESSION['role'] === 'kasir'): ?>
+                    <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
+                <?php endif; ?>
+                <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'riwayat' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=riwayat"><i class="bi bi-clock-history me-2"></i> Riwayat Pesanan</a></li>
+            </ul>
+            <div class="d-flex align-items-center ms-auto mt-2 mt-md-0 gap-2">
+                <button class="btn btn-primary position-relative" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCart">
+                    <i class="bi bi-cart-fill"></i>
+                    <span class="badge bg-danger ms-1 position-absolute top-0 start-100 translate-middle" id="cart-count">0</span>
+                </button>
+                <span class="navbar-text d-none d-md-inline-block">
+                    <i class="bi bi-person-circle me-1"></i> <?php echo htmlspecialchars($_SESSION['username']); ?>
+                </span>
+                <a href="index.php?page=logout" class="btn btn-outline-danger btn-sm ms-1"><i class="bi bi-box-arrow-right"></i></a>
             </div>
         </div>
+        <!-- Mobile menu: dropdown -->
+        <div class="d-md-none ms-auto">
+            <button class="btn btn-outline-secondary" id="mobileMenuDropdownBtn" type="button" aria-label="Menu" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-list"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end mt-2 shadow-sm" id="mobileMenuDropdown">
+                <li><a class="dropdown-item <?php echo $page == 'home' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=home"><i class="bi bi-house-door me-2"></i> Home</a></li>
+                <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <li><a class="dropdown-item <?php echo $page == 'produk' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=produk"><i class="bi bi-box-seam me-2"></i> Manajemen Produk</a></li>
+                    <li><a class="dropdown-item <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
+                <?php elseif ($_SESSION['role'] === 'kasir'): ?>
+                    <li><a class="dropdown-item <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
+                <?php endif; ?>
+                <li><a class="dropdown-item <?php echo $page == 'riwayat' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=riwayat"><i class="bi bi-clock-history me-2"></i> Riwayat Pesanan</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item d-flex align-items-center" href="#" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCart"><i class="bi bi-cart-fill me-2"></i> Keranjang <span class="badge bg-danger ms-1" id="cart-count-mobile">0</span></a></li>
+                <li><div class="dropdown-item-text d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-person-circle me-1"></i> <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                    <a href="index.php?page=logout" class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-box-arrow-right"></i></a>
+                </div></li>
+            </ul>
+        </div>
     </nav>
+    <div class="container my-4">
     <?php endif; ?>
 
-    <main class="container my-4">
+    <main class="container my-4" style="max-width: 100%;">
         <?php
         // Menampilkan notifikasi floating
         if (isset($_SESSION['success'])) {
@@ -323,6 +394,9 @@ switch ($page) {
             </div>
         </div>
     </div>
+    <?php if (isset($_SESSION['user_id'])): ?>
+        </div> <!-- close main-content for sidebar layout -->
+    <?php endif; ?>
 
     <!-- Modal untuk Struk & Detail Riwayat -->
     <div class="modal fade" id="receiptModal" tabindex="-1">
