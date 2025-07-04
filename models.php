@@ -1,5 +1,4 @@
 <?php
-// 2. CLASS-CLASS MODEL (OOP)
 
 class User {
     private $conn;
@@ -50,6 +49,21 @@ class User {
         $stmt->bindParam(':role', $role);
 
         return $stmt->execute();
+    }
+
+    public function resetPassword($username, $new_password) {
+        $query = "SELECT id FROM " . $this->table_name . " WHERE username = :username";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+        if ($stmt->rowCount() === 0) {
+            return false; // Username tidak ditemukan
+        }
+        $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
+        $update = $this->conn->prepare("UPDATE " . $this->table_name . " SET password = :password WHERE username = :username");
+        $update->bindParam(':password', $hashed_password);
+        $update->bindParam(':username', $username);
+        return $update->execute();
     }
 
     public function logout() {

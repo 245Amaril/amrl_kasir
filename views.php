@@ -1,6 +1,5 @@
 <?php
 
-// 3. FUNGSI UNTUK VIEW (TAMPILAN HTML) - OOP VERSION
 class View {
     public static function login() { ob_start(); ?>
         <div class="form-container">
@@ -28,6 +27,7 @@ class View {
                 </div>
                 <div class="card-footer text-center bg-light border-0 py-3">
                     <p class="mb-0">Belum punya akun? <a href="index.php?page=register">Daftar di sini</a></p>
+                    <p class="mb-0 mt-2"><a href="index.php?page=reset">Lupa password?</a></p>
                 </div>
             </div>
         </div>
@@ -66,6 +66,37 @@ class View {
                 </div>
                 <div class="card-footer text-center bg-light border-0 py-3">
                     <p class="mb-0">Sudah punya akun? <a href="index.php?page=login">Login di sini</a></p>
+                </div>
+            </div>
+        </div>
+    <?php return ob_get_clean(); }
+
+    public static function reset() { ob_start(); ?>
+        <div class="form-container">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <h3 class="card-title text-center mb-4">Reset Password</h3>
+                    <form action="index.php" method="POST">
+                        <input type="hidden" name="action" value="reset_password">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
+                            <label for="username"><i class="bi bi-person me-2"></i>Username</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" id="new_password" name="new_password" placeholder="Password Baru" required>
+                            <label for="new_password"><i class="bi bi-lock me-2"></i>Password Baru</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" id="confirm_new_password" name="confirm_new_password" placeholder="Konfirmasi Password Baru" required>
+                            <label for="confirm_new_password"><i class="bi bi-shield-lock me-2"></i>Konfirmasi Password Baru</label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Reset Password</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center bg-light border-0 py-3">
+                    <p class="mb-0"><a href="index.php?page=login">Kembali ke Login</a></p>
                 </div>
             </div>
         </div>

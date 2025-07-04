@@ -44,6 +44,21 @@ function handle_image_upload($file_input_name, $current_image = '') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     switch ($action) {
+        case 'reset_password':
+            $username = $_POST['username'] ?? '';
+            $new_password = $_POST['new_password'] ?? '';
+            $confirm_new_password = $_POST['confirm_new_password'] ?? '';
+            if ($new_password !== $confirm_new_password) {
+                $_SESSION['error'] = "Konfirmasi password baru tidak cocok!";
+                header("Location: index.php?page=reset");
+            } elseif ($user->resetPassword($username, $new_password)) {
+                $_SESSION['success'] = "Password berhasil direset. Silakan login.";
+                header("Location: index.php?page=login");
+            } else {
+                $_SESSION['error'] = "Username tidak ditemukan atau gagal reset password.";
+                header("Location: index.php?page=reset");
+            }
+            exit();
         case 'login':
             if ($user->login($_POST['username'], $_POST['password'])) {
                 header("Location: index.php?page=home");
@@ -142,6 +157,7 @@ $content = '';
 switch ($page) {
     case 'login': $content = View::login(); break;
     case 'register': $content = View::register(); break;
+    case 'reset': $content = View::reset(); break;
     case 'home': $content = View::home($product); break;
     case 'produk': $content = View::produk($product); break;
     case 'riwayat': $content = View::riwayat($order); break;

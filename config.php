@@ -1,5 +1,5 @@
 <?php
-// 1. KONFIGURASI DAN KONEKSI DATABASE
+
 class Database {
     private $host = 'localhost';
     private $db_name = 'db_pos_uas';
