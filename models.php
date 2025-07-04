@@ -21,7 +21,6 @@ class User {
                     $_SESSION['user_id'] = $row['id'];
                     $_SESSION['username'] = $row['username'];
                     $_SESSION['role'] = $row['role'];
-                    // Buat instance sesuai role
                     if ($row['role'] === 'admin') {
                         $_SESSION['user_obj'] = serialize(new Admin($row['id'], $row['username']));
                     } elseif ($row['role'] === 'kasir') {
@@ -80,7 +79,6 @@ class User {
     }
 }
 
-// OOP: Role sebagai turunan User
 class Admin extends User {
     public $id;
     public $username;
@@ -89,7 +87,6 @@ class Admin extends User {
         $this->id = $id;
         $this->username = $username;
     }
-    // Tambahkan method khusus admin jika perlu
 }
 
 class Kasir extends User {
@@ -100,9 +97,7 @@ class Kasir extends User {
         $this->id = $id;
         $this->username = $username;
     }
-    // Tambahkan method khusus kasir jika perlu
 }
-
 
 // Base Product: hanya read
 class Product {
@@ -205,10 +200,7 @@ class AdminProduct extends Product {
     }
 }
 
-// KasirProduct: hanya read
-class KasirProduct extends Product {
-    // Tidak ada method tambahan, hanya readAll/readOne/getTrashed dari parent
-}
+// KasirProduct: hanya read, tidak bisa CRUD
 
 class Order {
     private $conn;

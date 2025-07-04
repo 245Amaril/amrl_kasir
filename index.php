@@ -1,5 +1,4 @@
 <?php
-// Mulai session di baris paling atas
 session_start();
 
 require_once 'config.php';
@@ -14,8 +13,6 @@ $user = new User($db);
 // Inisialisasi product sesuai role
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     $product = new AdminProduct($db);
-} elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'kasir') {
-    $product = new KasirProduct($db);
 } else {
     $product = new Product($db);
 }
@@ -179,9 +176,6 @@ if (isset($_SESSION['user_id']) && in_array($page, ['login', 'register'])) {
 if ($page === 'produk' && (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin')) {
     $page = 'home';
 }
-if ($page === 'statistik' && (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['admin','kasir']))) {
-    $page = 'home';
-}
 if ($page === 'logout') {
     $user->logout();
 }
@@ -200,9 +194,6 @@ switch ($page) {
 }
 
 ?>
-<!-- =================================================================== -->
-<!-- 5. TEMPLATE HTML UTAMA                                            -->
-<!-- =================================================================== -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -303,9 +294,7 @@ switch ($page) {
     </style>
 </head>
 <body>
-
     <?php if (isset($_SESSION['user_id'])): ?>
-    <!-- Navbar Utama di Atas -->
     <nav class="navbar navbar-light bg-white shadow-sm px-3 py-2 d-flex align-items-center justify-content-between flex-wrap no-print" style="position:sticky;top:0;z-index:2102;min-height:56px;">
         <a class="navbar-brand fw-bold text-primary d-flex align-items-center m-0 me-4" href="index.php?page=home" style="font-size: 1.3rem;"><i class="bi bi-shop-window me-2"></i> KEDAI BIASANE</a>
         <!-- Desktop menu -->
@@ -314,10 +303,8 @@ switch ($page) {
                 <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'home' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=home"><i class="bi bi-house-door me-2"></i> Home</a></li>
                 <?php if ($_SESSION['role'] === 'admin'): ?>
                     <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'produk' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=produk"><i class="bi bi-box-seam me-2"></i> Manajemen Produk</a></li>
-                    <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
-                <?php elseif ($_SESSION['role'] === 'kasir'): ?>
-                    <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
                 <?php endif; ?>
+                <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
                 <li class="nav-item mx-1"><a class="nav-link px-2 <?php echo $page == 'riwayat' ? 'active fw-semibold text-primary' : 'text-dark'; ?>" href="index.php?page=riwayat"><i class="bi bi-clock-history me-2"></i> Riwayat Pesanan</a></li>
             </ul>
             <div class="d-flex align-items-center ms-auto mt-2 mt-md-0 gap-2">
@@ -331,7 +318,7 @@ switch ($page) {
                 <a href="index.php?page=logout" class="btn btn-outline-danger btn-sm ms-1"><i class="bi bi-box-arrow-right"></i></a>
             </div>
         </div>
-        <!-- Mobile menu: dropdown -->
+        <!-- Mobile menu -->
         <div class="d-md-none ms-auto">
             <button class="btn btn-outline-secondary" id="mobileMenuDropdownBtn" type="button" aria-label="Menu" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-list"></i>
@@ -340,10 +327,8 @@ switch ($page) {
                 <li><a class="dropdown-item <?php echo $page == 'home' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=home"><i class="bi bi-house-door me-2"></i> Home</a></li>
                 <?php if ($_SESSION['role'] === 'admin'): ?>
                     <li><a class="dropdown-item <?php echo $page == 'produk' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=produk"><i class="bi bi-box-seam me-2"></i> Manajemen Produk</a></li>
-                    <li><a class="dropdown-item <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
-                <?php elseif ($_SESSION['role'] === 'kasir'): ?>
-                    <li><a class="dropdown-item <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
                 <?php endif; ?>
+                <li><a class="dropdown-item <?php echo $page == 'statistik' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=statistik"><i class="bi bi-bar-chart-line me-2"></i> Statistik</a></li>
                 <li><a class="dropdown-item <?php echo $page == 'riwayat' ? 'active fw-semibold text-primary' : ''; ?>" href="index.php?page=riwayat"><i class="bi bi-clock-history me-2"></i> Riwayat Pesanan</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item d-flex align-items-center" href="#" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCart"><i class="bi bi-cart-fill me-2"></i> Keranjang <span class="badge bg-danger ms-1" id="cart-count-mobile">0</span></a></li>
@@ -420,7 +405,6 @@ switch ($page) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Jangan jalankan script keranjang jika tidak login
         if (!document.getElementById('offcanvasCart')) return;
 
         let cart = JSON.parse(localStorage.getItem('posCart')) || [];
@@ -484,14 +468,12 @@ switch ($page) {
                 }
             }
             updateCartView();
-            // Tampilkan offcanvas
             const cartOffcanvas = new bootstrap.Offcanvas(document.getElementById('offcanvasCart'));
             cartOffcanvas.show();
         };
 
         window.removeFromCart = (index) => {
             cart.splice(index, 1);
-            // Jika keranjang kosong setelah penghapusan, reset total ke 0
             if (cart.length === 0) {
                 document.getElementById('cart-total').textContent = formatRupiah(0);
             }
@@ -515,8 +497,6 @@ switch ($page) {
         };
         
         document.getElementById('btn-clear-cart').addEventListener('click', () => {
-
-            // Floating confirmation for clear cart
             showFloatingConfirm({
                 message: 'Anda yakin ingin mengosongkan keranjang?',
                 confirmText: 'Ya, Kosongkan',
@@ -615,7 +595,6 @@ switch ($page) {
         if (urlParams.get('status') === 'success' && <?php echo isset($_SESSION['last_order_id']) ? 'true' : 'false'; ?>) {
             const orderId = <?php echo $_SESSION['last_order_id'] ?? 0; ?>;
             if(orderId > 0) {
-                // Show custom success dialog with struk
                 fetch(`index.php?page=riwayat&ajax=1&detail_id=${orderId}`)
                     .then(response => response.text())
                     .then(data => {

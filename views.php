@@ -132,7 +132,6 @@ class View {
         </div>
     <?php return ob_get_clean(); }
 
-    // view_produk
     public static function produk($product_obj) { ob_start(); ?>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Manajemen Produk</h2>
@@ -367,7 +366,6 @@ class View {
         </div>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Modal konfirmasi pindah ke tempat sampah
             var moveToTrashModal = document.getElementById('moveToTrashModal');
             var moveToTrashName = document.getElementById('move-to-trash-name');
             var confirmMoveToTrashBtn = document.getElementById('confirm-move-to-trash');
@@ -377,7 +375,6 @@ class View {
                     var id = btn.getAttribute('data-id');
                     var name = btn.getAttribute('data-name');
                     moveToTrashName.textContent = name;
-                    // Temukan form terkait
                     currentTrashForm = btn.closest('form');
                     var modal = bootstrap.Modal.getOrCreateInstance(moveToTrashModal);
                     modal.show();
