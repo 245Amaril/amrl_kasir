@@ -55,7 +55,7 @@ class View {
                         <div class="form-floating mb-3">
                             <select class="form-select" id="role" name="role" required>
                                 <option value="kasir" selected>Kasir</option>
-                                <option value="pemilik">Pemilik</option>
+                                <option value="admin">Admin</option>
                             </select>
                             <label for="role"><i class="bi bi-person-badge me-2"></i>Daftar sebagai</label>
                         </div>
@@ -136,8 +136,12 @@ class View {
     public static function produk($product_obj) { ob_start(); ?>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Manajemen Produk</h2>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal"><i class="bi bi-plus-circle-fill me-2"></i>Tambah Produk</button>
+            <div>
+                <button class="btn btn-secondary me-2" data-bs-toggle="modal" data-bs-target="#trashModal"><i class="bi bi-trash3 me-2"></i>Lihat Tempat Sampah</button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal"><i class="bi bi-plus-circle-fill me-2"></i>Tambah Produk</button>
+            </div>
         </div>
+
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="table-responsive">
@@ -172,11 +176,11 @@ class View {
                                         data-bs-image="<?php echo $image; ?>">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteProductModal"
-                                        data-bs-id="<?php echo $id; ?>"
-                                        data-bs-name="<?php echo htmlspecialchars($name); ?>">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                    <form action="index.php" method="post" class="d-inline move-to-trash-form">
+                                        <input type="hidden" name="action" value="move_to_trash">
+                                        <input type="hidden" name="id" value="<?php echo $id; ?>">
+                                        <button type="button" class="btn btn-sm btn-danger btn-move-to-trash" data-id="<?php echo $id; ?>" data-name="<?php echo htmlspecialchars($name); ?>"><i class="bi bi-trash"></i></button>
+                                    </form>
                                 </td>
                             </tr>
                             <?php } ?>
@@ -186,31 +190,44 @@ class View {
             </div>
         </div>
 
-        <!-- Modals for Produk -->
+        <!-- Modal Tambah Produk -->
         <div class="modal fade" id="addProductModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <form action="index.php" method="post" enctype="multipart/form-data">
                         <div class="modal-header">
-                            <h5 class="modal-title">Tambah Produk Baru</h5>
+                            <h5 class="modal-title">Tambah Produk</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <input type="hidden" name="action" value="add_product">
-                            <div class="mb-3"><label class="form-label">Nama Produk</label><input type="text" name="name" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Harga</label><input type="number" name="price" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Stok</label><input type="number" name="stock" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Gambar Produk</label><input type="file" name="image" class="form-control" accept="image/*"></div>
+                            <div class="mb-3">
+                                <label for="add-name" class="form-label">Nama Produk</label>
+                                <input type="text" class="form-control" id="add-name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add-price" class="form-label">Harga</label>
+                                <input type="number" class="form-control" id="add-price" name="price" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add-stock" class="form-label">Stok</label>
+                                <input type="number" class="form-control" id="add-stock" name="stock" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add-image" class="form-label">Gambar Produk</label>
+                                <input type="file" class="form-control" id="add-image" name="image" accept="image/*">
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" class="btn btn-primary">Simpan</button>
+                            <button type="submit" class="btn btn-primary">Tambah</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
+        <!-- Modal Edit Produk -->
         <div class="modal fade" id="editProductModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -223,42 +240,170 @@ class View {
                             <input type="hidden" name="action" value="edit_product">
                             <input type="hidden" name="id" id="edit-id">
                             <input type="hidden" name="current_image" id="edit-current-image">
-                            <div class="text-center mb-3"><img id="edit-image-preview" src="" class="rounded-3" style="width:100px; height:100px; object-fit:cover;"></div>
-                            <div class="mb-3"><label class="form-label">Nama Produk</label><input type="text" name="name" id="edit-name" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Harga</label><input type="number" name="price" id="edit-price" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Stok</label><input type="number" name="stock" id="edit-stock" class="form-control" required></div>
-                            <div class="mb-3"><label class="form-label">Ganti Gambar (Opsional)</label><input type="file" name="image" class="form-control" accept="image/*"></div>
+                            <div class="mb-3">
+                                <label for="edit-name" class="form-label">Nama Produk</label>
+                                <input type="text" class="form-control" id="edit-name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit-price" class="form-label">Harga</label>
+                                <input type="number" class="form-control" id="edit-price" name="price" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit-stock" class="form-label">Stok</label>
+                                <input type="number" class="form-control" id="edit-stock" name="stock" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit-image" class="form-label">Gambar Produk</label>
+                                <input type="file" class="form-control" id="edit-image" name="image" accept="image/*">
+                                <div class="mt-2">
+                                    <img id="edit-image-preview" src="" alt="Preview" style="width:100px; height:100px; object-fit:cover; border-radius:8px; background:#eee;">
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                            <button type="submit" class="btn btn-warning">Simpan Perubahan</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="modal fade" id="deleteProductModal" tabindex="-1">
+        <!-- Modal Konfirmasi Pindah ke Tempat Sampah -->
+        <div class="modal fade" id="moveToTrashModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Konfirmasi Pindahkan ke Tempat Sampah</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Anda yakin ingin memindahkan produk <strong id="move-to-trash-name"></strong> ke tempat sampah?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-danger" id="confirm-move-to-trash">Ya, Pindahkan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Tempat Sampah Produk -->
+        <div class="modal fade" id="trashModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-trash3"></i> Tempat Sampah Produk</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Gambar</th>
+                                        <th>Nama Produk</th>
+                                        <th>Harga</th>
+                                        <th>Stok</th>
+                                        <th>Dihapus Pada</th>
+                                        <th class="text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $trashed = $product_obj->getTrashed();
+                                    if ($trashed->rowCount() > 0) {
+                                        while ($row = $trashed->fetch(PDO::FETCH_ASSOC)) {
+                                            extract($row);
+                                            $image_path = !empty($image) && file_exists('uploads/' . $image) ? 'uploads/' . $image : 'https://placehold.co/100x100/E9ECEF/6C757D?text=N/A';
+                                    ?>
+                                    <tr>
+                                        <td><img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($name); ?>" style="width: 60px; height: 60px; object-fit: cover;" class="rounded-3"></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($name); ?></td>
+                                        <td>Rp <?php echo number_format($price, 0, ',', '.'); ?></td>
+                                        <td><?php echo $stock; ?></td>
+                                        <td><span class="badge bg-danger-subtle text-danger"><?php echo date('d-m-Y H:i', strtotime($deleted_at)); ?></span></td>
+                                        <td class="text-center">
+                                            <form action="index.php" method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="restore_product">
+                                                <input type="hidden" name="id" value="<?php echo $id; ?>">
+                                                <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-clockwise"></i> Kembalikan</button>
+                                            </form>
+                                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePermanentModal" data-id="<?php echo $id; ?>" data-name="<?php echo htmlspecialchars($name); ?>"><i class="bi bi-x-circle"></i> Hapus Permanen</button>
+                                        </td>
+                                    </tr>
+                                    <?php } } else { ?>
+                                        <tr><td colspan="6" class="text-center text-muted">Tidak ada produk di tempat sampah.</td></tr>
+                                    <?php } ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Konfirmasi Hapus Permanen -->
+        <div class="modal fade" id="deletePermanentModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <form action="index.php" method="post">
                         <div class="modal-header">
-                            <h5 class="modal-title">Konfirmasi Hapus</h5>
+                            <h5 class="modal-title">Konfirmasi Hapus Permanen</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <input type="hidden" name="action" value="delete_product">
-                            <input type="hidden" name="id" id="delete-id">
-                            <p>Anda yakin ingin menghapus produk <strong id="delete-product-name"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
+                            <input type="hidden" name="action" value="delete_permanent">
+                            <input type="hidden" name="id" id="delete-permanent-id">
+                            <p>Anda yakin ingin <span class="text-danger fw-bold">menghapus permanen</span> produk <strong id="delete-permanent-name"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" class="btn btn-danger">Ya, Hapus</button>
+                            <button type="submit" class="btn btn-danger">Ya, Hapus Permanen</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Modal konfirmasi pindah ke tempat sampah
+            var moveToTrashModal = document.getElementById('moveToTrashModal');
+            var moveToTrashName = document.getElementById('move-to-trash-name');
+            var confirmMoveToTrashBtn = document.getElementById('confirm-move-to-trash');
+            var currentTrashForm = null;
+            document.querySelectorAll('.btn-move-to-trash').forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    var id = btn.getAttribute('data-id');
+                    var name = btn.getAttribute('data-name');
+                    moveToTrashName.textContent = name;
+                    // Temukan form terkait
+                    currentTrashForm = btn.closest('form');
+                    var modal = bootstrap.Modal.getOrCreateInstance(moveToTrashModal);
+                    modal.show();
+                });
+            });
+            if (confirmMoveToTrashBtn) {
+                confirmMoveToTrashBtn.addEventListener('click', function() {
+                    if (currentTrashForm) {
+                        currentTrashForm.submit();
+                    }
+                    var modal = bootstrap.Modal.getOrCreateInstance(moveToTrashModal);
+                    modal.hide();
+                });
+            }
+            var deletePermanentModal = document.getElementById('deletePermanentModal');
+            if(deletePermanentModal){
+                deletePermanentModal.addEventListener('show.bs.modal', function(event) {
+                    var button = event.relatedTarget;
+                    var id = button.getAttribute('data-id');
+                    var name = button.getAttribute('data-name');
+                    deletePermanentModal.querySelector('#delete-permanent-id').value = id;
+                    deletePermanentModal.querySelector('#delete-permanent-name').textContent = name;
+                });
+            }
+        });
+        </script>
     <?php return ob_get_clean(); }
 
     public static function riwayat($order_obj) {

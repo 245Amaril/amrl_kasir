@@ -11,7 +11,14 @@ $database = new Database();
 $db = $database->getConnection();
 
 $user = new User($db);
-$product = new Product($db);
+// Inisialisasi product sesuai role
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+    $product = new AdminProduct($db);
+} elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'kasir') {
+    $product = new KasirProduct($db);
+} else {
+    $product = new Product($db);
+}
 $order = new Order($db);
 
 // --- Fungsi untuk menangani upload gambar ---
@@ -41,24 +48,9 @@ function handle_image_upload($file_input_name, $current_image = '') {
 }
 
 // --- Penanganan Aksi dari Form (POST Request) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
     switch ($action) {
-        case 'reset_password':
-            $username = $_POST['username'] ?? '';
-            $new_password = $_POST['new_password'] ?? '';
-            $confirm_new_password = $_POST['confirm_new_password'] ?? '';
-            if ($new_password !== $confirm_new_password) {
-                $_SESSION['error'] = "Konfirmasi password baru tidak cocok!";
-                header("Location: index.php?page=reset");
-            } elseif ($user->resetPassword($username, $new_password)) {
-                $_SESSION['success'] = "Password berhasil direset. Silakan login.";
-                header("Location: index.php?page=login");
-            } else {
-                $_SESSION['error'] = "Username tidak ditemukan atau gagal reset password.";
-                header("Location: index.php?page=reset");
-            }
-            exit();
         case 'login':
             if ($user->login($_POST['username'], $_POST['password'])) {
                 header("Location: index.php?page=home");
@@ -80,9 +72,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: index.php?page=register");
             }
             exit();
+            
+        case 'reset_password':
+            $username = $_POST['username'] ?? '';
+            $new_password = $_POST['new_password'] ?? '';
+            $confirm_new_password = $_POST['confirm_new_password'] ?? '';
+            if ($new_password !== $confirm_new_password) {
+                $_SESSION['error'] = "Konfirmasi password baru tidak cocok!";
+                header("Location: index.php?page=reset");
+            } elseif ($user->resetPassword($username, $new_password)) {
+                $_SESSION['success'] = "Password berhasil direset. Silakan login.";
+                header("Location: index.php?page=login");
+            } else {
+                $_SESSION['error'] = "Username tidak ditemukan atau gagal reset password.";
+                header("Location: index.php?page=reset");
+            }
+            exit();
 
         case 'add_product':
-            if ($_SESSION['role'] === 'pemilik') {
+            if ($_SESSION['role'] === 'admin') {
                 $image_name = handle_image_upload('image');
                 if ($product->create($_POST['name'], $_POST['price'], $_POST['stock'], $image_name)) {
                     $_SESSION['success'] = "Produk berhasil ditambahkan.";
@@ -94,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
             
         case 'edit_product':
-            if ($_SESSION['role'] === 'pemilik') {
+            if ($_SESSION['role'] === 'admin') {
                 $image_name = handle_image_upload('image', $_POST['current_image']);
                 if ($product->update($_POST['id'], $_POST['name'], $_POST['price'], $_POST['stock'], $image_name)) {
                     $_SESSION['success'] = "Produk berhasil diperbarui.";
@@ -106,9 +114,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
             
         case 'delete_product':
-            if ($_SESSION['role'] === 'pemilik') {
+            if ($_SESSION['role'] === 'admin') {
                 $product->delete($_POST['id']);
                 $_SESSION['success'] = "Produk berhasil dihapus.";
+            }
+            header("Location: index.php?page=produk");
+            exit();
+
+        case 'move_to_trash':
+            if ($_SESSION['role'] === 'admin') {
+                $product->moveToTrash($_POST['id']);
+                $_SESSION['success'] = "Produk dipindahkan ke tempat sampah.";
+            }
+            header("Location: index.php?page=produk");
+            exit();
+        case 'restore_product':
+            if ($_SESSION['role'] === 'admin') {
+                $product->restore($_POST['id']);
+                $_SESSION['success'] = "Produk berhasil dikembalikan.";
+            }
+            header("Location: index.php?page=produk");
+            exit();
+        case 'delete_permanent':
+            if ($_SESSION['role'] === 'admin') {
+                $product->deletePermanent($_POST['id']);
+                $_SESSION['success'] = "Produk dihapus permanen.";
             }
             header("Location: index.php?page=produk");
             exit();
@@ -139,13 +169,17 @@ if (isset($_GET['ajax']) && $_GET['page'] === 'riwayat' && isset($_GET['detail_i
 $page = $_GET['page'] ?? (isset($_SESSION['user_id']) ? 'home' : 'login');
 
 // Proteksi halaman
-if (!isset($_SESSION['user_id']) && !in_array($page, ['login', 'register'])) {
+if (!isset($_SESSION['user_id']) && !in_array($page, ['login', 'register', 'reset'])) {
     $page = 'login';
 }
 if (isset($_SESSION['user_id']) && in_array($page, ['login', 'register'])) {
     $page = 'home';
 }
-if (($page === 'produk' || $page === 'statistik') && (!isset($_SESSION['role']) || $_SESSION['role'] !== 'pemilik')) {
+// Hanya admin yang bisa akses produk, kasir & admin bisa akses statistik
+if ($page === 'produk' && (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin')) {
+    $page = 'home';
+}
+if ($page === 'statistik' && (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['admin','kasir']))) {
     $page = 'home';
 }
 if ($page === 'logout') {
@@ -193,6 +227,21 @@ switch ($page) {
         .offcanvas-body { display: flex; flex-direction: column; }
         .cart-items { flex-grow: 1; }
 
+        .floating-alert {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            min-width: 320px;
+            max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            animation: fadeInDown .5s;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px) translateX(-50%); }
+            to { opacity: 1; transform: translateY(0) translateX(-50%); }
+        }
         @media print {
             body * { visibility: hidden; }
             .print-area, .print-area * { visibility: visible; }
@@ -214,8 +263,10 @@ switch ($page) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link <?php echo $page == 'home' ? 'active' : ''; ?>" href="index.php?page=home">Home</a></li>
-                    <?php if ($_SESSION['role'] === 'pemilik'): ?>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
                         <li class="nav-item"><a class="nav-link <?php echo $page == 'produk' ? 'active' : ''; ?>" href="index.php?page=produk">Manajemen Produk</a></li>
+                        <li class="nav-item"><a class="nav-link <?php echo $page == 'statistik' ? 'active' : ''; ?>" href="index.php?page=statistik">Statistik</a></li>
+                    <?php elseif ($_SESSION['role'] === 'kasir'): ?>
                         <li class="nav-item"><a class="nav-link <?php echo $page == 'statistik' ? 'active' : ''; ?>" href="index.php?page=statistik">Statistik</a></li>
                     <?php endif; ?>
                     <li class="nav-item"><a class="nav-link <?php echo $page == 'riwayat' ? 'active' : ''; ?>" href="index.php?page=riwayat">Riwayat Pesanan</a></li>
@@ -237,16 +288,15 @@ switch ($page) {
 
     <main class="container my-4">
         <?php
-        // Menampilkan notifikasi
+        // Menampilkan notifikasi floating
         if (isset($_SESSION['success'])) {
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle-fill me-2"></i>' . $_SESSION['success'] . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+            echo '<div class="alert alert-success alert-dismissible fade show floating-alert" role="alert"><i class="bi bi-check-circle-fill me-2"></i>' . $_SESSION['success'] . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
             unset($_SESSION['success']);
         }
         if (isset($_SESSION['error'])) {
-            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-triangle-fill me-2"></i>' . $_SESSION['error'] . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+            echo '<div class="alert alert-danger alert-dismissible fade show floating-alert" role="alert"><i class="bi bi-exclamation-triangle-fill me-2"></i>' . $_SESSION['error'] . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
             unset($_SESSION['error']);
         }
-        
         // Menampilkan konten halaman yang sudah disiapkan
         echo $content;
         ?>
@@ -314,6 +364,7 @@ switch ($page) {
             cartItemsContainer.innerHTML = '';
             if (cart.length === 0) {
                 cartItemsContainer.innerHTML = '<p class="text-center text-muted mt-5">Keranjang Anda kosong.</p>';
+                cartTotal.textContent = formatRupiah(0); // Reset total ke 0
                 btnCheckout.disabled = true;
             } else {
                 let total = 0;
@@ -326,7 +377,11 @@ switch ($page) {
                             <h6 class="mb-0 small">${item.name}</h6>
                             <small class="text-muted">${formatRupiah(item.price)}</small>
                         </div>
-                        <input type="number" value="${item.quantity}" min="1" max="${item.stock}" class="form-control form-control-sm mx-2" style="width: 60px;" onchange="updateQuantity(${index}, this.value)">
+                        <div class="input-group input-group-sm mx-2" style="width: 90px;">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${item.id}, -1)">-</button>
+                            <span class="mx-2">${item.quantity}</span>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${item.id}, 1)">+</button>
+                        </div>
                         <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart(${index})"><i class="bi bi-x"></i></button>
                     `;
                     cartItemsContainer.appendChild(itemElement);
@@ -362,19 +417,25 @@ switch ($page) {
 
         window.removeFromCart = (index) => {
             cart.splice(index, 1);
+            // Jika keranjang kosong setelah penghapusan, reset total ke 0
+            if (cart.length === 0) {
+                document.getElementById('cart-total').textContent = formatRupiah(0);
+            }
             updateCartView();
         };
         
-        window.updateQuantity = (index, quantity) => {
-            const qty = parseInt(quantity, 10);
-            if (qty > 0 && qty <= cart[index].stock) {
-                cart[index].quantity = qty;
-            } else if (qty > cart[index].stock) {
+        window.updateQuantity = (id, delta) => {
+            const idx = cart.findIndex(item => item.id === id);
+            if (idx === -1) return;
+            let newQty = cart[idx].quantity + delta;
+            if (newQty > cart[idx].stock) {
                 alert('Stok tidak mencukupi!');
-                cart[index].quantity = cart[index].stock;
+                newQty = cart[idx].stock;
             }
-            else {
-                cart.splice(index, 1);
+            if (newQty < 1) {
+                cart.splice(idx, 1);
+            } else {
+                cart[idx].quantity = newQty;
             }
             updateCartView();
         };

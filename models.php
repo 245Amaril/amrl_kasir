@@ -21,6 +21,12 @@ class User {
                     $_SESSION['user_id'] = $row['id'];
                     $_SESSION['username'] = $row['username'];
                     $_SESSION['role'] = $row['role'];
+                    // Buat instance sesuai role
+                    if ($row['role'] === 'admin') {
+                        $_SESSION['user_obj'] = serialize(new Admin($row['id'], $row['username']));
+                    } elseif ($row['role'] === 'kasir') {
+                        $_SESSION['user_obj'] = serialize(new Kasir($row['id'], $row['username']));
+                    }
                     return true;
                 }
             }
@@ -74,21 +80,53 @@ class User {
     }
 }
 
+// OOP: Role sebagai turunan User
+class Admin extends User {
+    public $id;
+    public $username;
+    public $role = 'admin';
+    public function __construct($id, $username) {
+        $this->id = $id;
+        $this->username = $username;
+    }
+    // Tambahkan method khusus admin jika perlu
+}
+
+class Kasir extends User {
+    public $id;
+    public $username;
+    public $role = 'kasir';
+    public function __construct($id, $username) {
+        $this->id = $id;
+        $this->username = $username;
+    }
+    // Tambahkan method khusus kasir jika perlu
+}
+
+
+// Base Product: hanya read
 class Product {
-    private $conn;
-    private $table_name = "products";
+    protected $conn;
+    protected $table_name = "products";
 
     public function __construct($db) {
         $this->conn = $db;
     }
 
-    public function readAll() {
-        $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " ORDER BY name ASC";
+    public function getTrashed() {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         return $stmt;
     }
-    
+
+    public function readAll() {
+        $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " WHERE deleted_at IS NULL ORDER BY name ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt;
+    }
+
     public function readOne($id) {
         $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " WHERE id = ?";
         $stmt = $this->conn->prepare($query);
@@ -96,7 +134,10 @@ class Product {
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+}
 
+// AdminProduct: bisa CRUD, restore, trash, deletePermanent
+class AdminProduct extends Product {
     public function create($name, $price, $stock, $image) {
         $query = "INSERT INTO " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image";
         $stmt = $this->conn->prepare($query);
@@ -106,7 +147,7 @@ class Product {
         $stmt->bindParam(':image', $image);
         return $stmt->execute();
     }
-    
+
     public function update($id, $name, $price, $stock, $image) {
         $query = "UPDATE " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image WHERE id=:id";
         $stmt = $this->conn->prepare($query);
@@ -123,12 +164,50 @@ class Product {
         if ($product && !empty($product['image']) && file_exists('uploads/' . $product['image'])) {
             unlink('uploads/' . $product['image']);
         }
-        
         $query = "DELETE FROM " . $this->table_name . " WHERE id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(1, $id);
         return $stmt->execute();
     }
+
+    public function moveToTrash($id) {
+        $query = "UPDATE " . $this->table_name . " SET deleted_at = NOW() WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $id);
+        return $stmt->execute();
+    }
+
+    public function restore($id) {
+        $query = "UPDATE " . $this->table_name . " SET deleted_at = NULL WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $id);
+        return $stmt->execute();
+    }
+
+    public function deletePermanent($id) {
+        $product = $this->readOne($id);
+        if ($product && !empty($product['image']) && file_exists('uploads/' . $product['image'])) {
+            unlink('uploads/' . $product['image']);
+        }
+        // Hapus riwayat transaksi terkait produk ini
+        $deleteOrderDetails = $this->conn->prepare("DELETE FROM order_details WHERE product_id = ?");
+        $deleteOrderDetails->bindParam(1, $id);
+        $deleteOrderDetails->execute();
+
+        // Hapus order yang tidak punya detail lagi (order yatim)
+        $deleteOrphanOrders = $this->conn->prepare("DELETE o FROM orders o LEFT JOIN order_details od ON o.id = od.order_id WHERE od.order_id IS NULL");
+        $deleteOrphanOrders->execute();
+
+        $query = "DELETE FROM " . $this->table_name . " WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $id);
+        return $stmt->execute();
+    }
+}
+
+// KasirProduct: hanya read
+class KasirProduct extends Product {
+    // Tidak ada method tambahan, hanya readAll/readOne/getTrashed dari parent
 }
 
 class Order {
