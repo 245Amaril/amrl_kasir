@@ -2,601 +2,11 @@
 // Mulai session di baris paling atas
 session_start();
 
-// ===================================================================
-// 1. KONFIGURASI DAN KONEKSI DATABASE
-// ===================================================================
-class Database {
-    private $host = 'localhost';
-    private $db_name = 'db_pos_uas';
-    private $username = 'root';
-    private $password = '';
-    public $conn;
+require_once 'config.php';
+require_once 'models.php';
+require_once 'views.php';
 
-    public function getConnection() {
-        $this->conn = null;
-        try {
-            $this->conn = new PDO("mysql:host=" . $this->host . ";dbname=" . $this->db_name, $this->username, $this->password);
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch (PDOException $exception) {
-            die("Kesalahan Koneksi Database: " . $exception->getMessage());
-        }
-        return $this->conn;
-    }
-}
-
-// ===================================================================
-// 2. CLASS-CLASS MODEL (OOP)
-// ===================================================================
-
-/**
- * Class User untuk menangani login, registrasi, dan data pengguna
- */
-class User {
-    private $conn;
-    private $table_name = "users";
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function login($username, $password) {
-        try {
-            $query = "SELECT id, username, password, role FROM " . $this->table_name . " WHERE username = :username";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':username', $username);
-            $stmt->execute();
-
-            if ($stmt->rowCount() > 0) {
-                $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                if (password_verify($password, $row['password'])) {
-                    $_SESSION['user_id'] = $row['id'];
-                    $_SESSION['username'] = $row['username'];
-                    $_SESSION['role'] = $row['role'];
-                    return true;
-                }
-            }
-            return false;
-        } catch (PDOException $e) {
-            error_log($e->getMessage());
-            return false;
-        }
-    }
-
-    public function register($username, $password, $role) {
-        $check_query = "SELECT id FROM " . $this->table_name . " WHERE username = :username";
-        $check_stmt = $this->conn->prepare($check_query);
-        $check_stmt->bindParam(':username', $username);
-        $check_stmt->execute();
-
-        if ($check_stmt->rowCount() > 0) {
-            return false; // Username sudah terdaftar
-        }
-
-        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-        $query = "INSERT INTO " . $this->table_name . " SET username=:username, password=:password, role=:role";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':username', $username);
-        $stmt->bindParam(':password', $hashed_password);
-        $stmt->bindParam(':role', $role);
-
-        return $stmt->execute();
-    }
-
-    public function logout() {
-        session_unset();
-        session_destroy();
-        header("Location: index.php?page=login");
-        exit();
-    }
-}
-
-/**
- * Class Product untuk menangani operasi CRUD produk
- */
-class Product {
-    private $conn;
-    private $table_name = "products";
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function readAll() {
-        $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " ORDER BY name ASC";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        return $stmt;
-    }
-    
-    public function readOne($id) {
-        $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " WHERE id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(1, $id);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
-    public function create($name, $price, $stock, $image) {
-        $query = "INSERT INTO " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':name', $name);
-        $stmt->bindParam(':price', $price);
-        $stmt->bindParam(':stock', $stock);
-        $stmt->bindParam(':image', $image);
-        return $stmt->execute();
-    }
-    
-    public function update($id, $name, $price, $stock, $image) {
-        $query = "UPDATE " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image WHERE id=:id";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':name', $name);
-        $stmt->bindParam(':price', $price);
-        $stmt->bindParam(':stock', $stock);
-        $stmt->bindParam(':image', $image);
-        return $stmt->execute();
-    }
-
-    public function delete($id) {
-        $product = $this->readOne($id);
-        if ($product && !empty($product['image']) && file_exists('uploads/' . $product['image'])) {
-            unlink('uploads/' . $product['image']);
-        }
-        
-        $query = "DELETE FROM " . $this->table_name . " WHERE id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(1, $id);
-        return $stmt->execute();
-    }
-}
-
-/**
- * Class Order untuk menangani pesanan, riwayat, dan statistik
- */
-class Order {
-    private $conn;
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function create($userId, $totalAmount, $cart) {
-        $this->conn->beginTransaction();
-        try {
-            $invoice_number = 'INV-' . date('Ymd') . '-' . strtoupper(uniqid());
-            $order_query = "INSERT INTO orders (invoice_number, user_id, total_amount) VALUES (?, ?, ?)";
-            $stmt = $this->conn->prepare($order_query);
-            $stmt->execute([$invoice_number, $userId, $totalAmount]);
-            $orderId = $this->conn->lastInsertId();
-
-            $detail_query = "INSERT INTO order_details (order_id, product_id, quantity, price_per_item) VALUES (?, ?, ?, ?)";
-            $update_stock_query = "UPDATE products SET stock = stock - ? WHERE id = ?";
-            
-            foreach ($cart as $item) {
-                $detail_stmt = $this->conn->prepare($detail_query);
-                $detail_stmt->execute([$orderId, $item['id'], $item['quantity'], $item['price']]);
-
-                $update_stmt = $this->conn->prepare($update_stock_query);
-                $update_stmt->execute([$item['quantity'], $item['id']]);
-            }
-            
-            $this->conn->commit();
-            return $orderId;
-        } catch (Exception $e) {
-            $this->conn->rollBack();
-            error_log("Order creation failed: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    public function getHistory($start_date, $end_date) {
-        $query = "SELECT o.id, o.invoice_number, o.total_amount, o.order_date, u.username 
-                  FROM orders o 
-                  JOIN users u ON o.user_id = u.id 
-                  WHERE DATE(o.order_date) BETWEEN ? AND ?
-                  ORDER BY o.order_date DESC";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$start_date, $end_date]);
-        return $stmt;
-    }
-
-    public function getOrderDetails($order_id) {
-        $query = "SELECT p.name, p.image, od.quantity, od.price_per_item 
-                  FROM order_details od
-                  JOIN products p ON od.product_id = p.id
-                  WHERE od.order_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$order_id]);
-        
-        $order_info_query = "SELECT * FROM orders WHERE id = ?";
-        $order_stmt = $this->conn->prepare($order_info_query);
-        $order_stmt->execute([$order_id]);
-
-        return ['items' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'info' => $order_stmt->fetch(PDO::FETCH_ASSOC)];
-    }
-
-    public function getDailyStats() {
-        $today = date('Y-m-d');
-        $stats = [];
-        $query_revenue = "SELECT SUM(total_amount) as total_revenue FROM orders WHERE DATE(order_date) = ?";
-        $stmt_revenue = $this->conn->prepare($query_revenue);
-        $stmt_revenue->execute([$today]);
-        $stats['revenue'] = $stmt_revenue->fetch(PDO::FETCH_ASSOC)['total_revenue'] ?? 0;
-
-        $query_trans = "SELECT COUNT(id) as total_transactions FROM orders WHERE DATE(order_date) = ?";
-        $stmt_trans = $this->conn->prepare($query_trans);
-        $stmt_trans->execute([$today]);
-        $stats['transactions'] = $stmt_trans->fetch(PDO::FETCH_ASSOC)['total_transactions'] ?? 0;
-        
-        return $stats;
-    }
-}
-
-// ===================================================================
-// 3. FUNGSI UNTUK VIEW (TAMPILAN HTML)
-// ===================================================================
-
-function view_login() { ob_start(); ?>
-<div class="form-container">
-    <div class="card shadow-lg border-0">
-        <div class="card-body p-5">
-            <div class="text-center mb-4">
-                <i class="bi bi-shop-window text-primary" style="font-size: 3rem;"></i>
-                <h3 class="card-title mt-2">Selamat Datang</h3>
-                <p class="text-muted">Silakan login untuk melanjutkan</p>
-            </div>
-            <form action="index.php" method="POST">
-                <input type="hidden" name="action" value="login">
-                <div class="form-floating mb-3">
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
-                    <label for="username"><i class="bi bi-person me-2"></i>Username</label>
-                </div>
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-                    <label for="password"><i class="bi bi-lock me-2"></i>Password</label>
-                </div>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Login</button>
-                </div>
-            </form>
-        </div>
-        <div class="card-footer text-center bg-light border-0 py-3">
-            <p class="mb-0">Belum punya akun? <a href="index.php?page=register">Daftar di sini</a></p>
-        </div>
-    </div>
-</div>
-<?php return ob_get_clean(); }
-
-function view_register() { ob_start(); ?>
-<div class="form-container">
-    <div class="card shadow-lg border-0">
-        <div class="card-body p-5">
-            <h3 class="card-title text-center mb-4">Buat Akun Baru</h3>
-            <form action="index.php" method="POST">
-                <input type="hidden" name="action" value="register">
-                <div class="form-floating mb-3">
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
-                    <label for="username"><i class="bi bi-person me-2"></i>Username</label>
-                </div>
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-                    <label for="password"><i class="bi bi-lock me-2"></i>Password</label>
-                </div>
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Konfirmasi Password" required>
-                    <label for="confirm_password"><i class="bi bi-shield-lock me-2"></i>Konfirmasi Password</label>
-                </div>
-                <div class="form-floating mb-3">
-                    <select class="form-select" id="role" name="role" required>
-                        <option value="kasir" selected>Kasir</option>
-                        <option value="pemilik">Pemilik</option>
-                    </select>
-                    <label for="role"><i class="bi bi-person-badge me-2"></i>Daftar sebagai</label>
-                </div>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Register</button>
-                </div>
-            </form>
-        </div>
-        <div class="card-footer text-center bg-light border-0 py-3">
-            <p class="mb-0">Sudah punya akun? <a href="index.php?page=login">Login di sini</a></p>
-        </div>
-    </div>
-</div>
-<?php return ob_get_clean(); }
-
-
-function view_home($product_obj) { ob_start(); ?>
-<h2 class="mb-4">Daftar Produk</h2>
-<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-    <?php
-    $products = $product_obj->readAll();
-    while ($row = $products->fetch(PDO::FETCH_ASSOC)) {
-        extract($row);
-        $image_path = !empty($image) && file_exists('uploads/' . $image) ? 'uploads/' . $image : 'https://placehold.co/400x300/E9ECEF/6C757D?text=Gambar+Produk';
-    ?>
-    <div class="col">
-        <div class="card h-100 product-card shadow-sm border-0">
-            <img src="<?php echo $image_path; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($name); ?>">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title flex-grow-1"><?php echo htmlspecialchars($name); ?></h5>
-                <p class="card-text text-primary fw-bold fs-5 mb-2">Rp <?php echo number_format($price, 0, ',', '.'); ?></p>
-                <p class="card-text"><small class="text-muted">Stok: <span class="fw-bold <?php echo $stock > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $stock; ?></span></small></p>
-            </div>
-            <div class="card-footer bg-white border-0 p-3">
-                <div class="d-grid">
-                    <button class="btn btn-primary" onclick="addToCart(<?php echo $id; ?>, '<?php echo htmlspecialchars(addslashes($name)); ?>', <?php echo $price; ?>, <?php echo $stock; ?>, '<?php echo $image_path; ?>')" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
-                        <i class="bi bi-cart-plus-fill me-2"></i> <?php echo $stock <= 0 ? 'Stok Habis' : 'Tambah'; ?>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php } ?>
-</div>
-<?php return ob_get_clean(); }
-
-function view_produk($product_obj) { ob_start(); ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Manajemen Produk</h2>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal"><i class="bi bi-plus-circle-fill me-2"></i>Tambah Produk</button>
-</div>
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>Gambar</th>
-                        <th>Nama Produk</th>
-                        <th>Harga</th>
-                        <th>Stok</th>
-                        <th class="text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $products = $product_obj->readAll();
-                    while ($row = $products->fetch(PDO::FETCH_ASSOC)) {
-                        extract($row);
-                        $image_path = !empty($image) && file_exists('uploads/' . $image) ? 'uploads/' . $image : 'https://placehold.co/100x100/E9ECEF/6C757D?text=N/A';
-                    ?>
-                    <tr>
-                        <td><img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($name); ?>" style="width: 60px; height: 60px; object-fit: cover;" class="rounded-3"></td>
-                        <td class="fw-bold"><?php echo htmlspecialchars($name); ?></td>
-                        <td>Rp <?php echo number_format($price, 0, ',', '.'); ?></td>
-                        <td><?php echo $stock; ?></td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editProductModal"
-                                data-bs-id="<?php echo $id; ?>"
-                                data-bs-name="<?php echo htmlspecialchars($name); ?>"
-                                data-bs-price="<?php echo $price; ?>"
-                                data-bs-stock="<?php echo $stock; ?>"
-                                data-bs-image="<?php echo $image; ?>">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteProductModal"
-                                data-bs-id="<?php echo $id; ?>"
-                                data-bs-name="<?php echo htmlspecialchars($name); ?>">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    <?php } ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Modals for Produk -->
-<div class="modal fade" id="addProductModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="index.php" method="post" enctype="multipart/form-data">
-                <div class="modal-header">
-                    <h5 class="modal-title">Tambah Produk Baru</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="add_product">
-                    <div class="mb-3"><label class="form-label">Nama Produk</label><input type="text" name="name" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Harga</label><input type="number" name="price" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Stok</label><input type="number" name="stock" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Gambar Produk</label><input type="file" name="image" class="form-control" accept="image/*"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="editProductModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="index.php" method="post" enctype="multipart/form-data">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="edit-modal-title">Edit Produk</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="edit_product">
-                    <input type="hidden" name="id" id="edit-id">
-                    <input type="hidden" name="current_image" id="edit-current-image">
-                    <div class="text-center mb-3"><img id="edit-image-preview" src="" class="rounded-3" style="width:100px; height:100px; object-fit:cover;"></div>
-                    <div class="mb-3"><label class="form-label">Nama Produk</label><input type="text" name="name" id="edit-name" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Harga</label><input type="number" name="price" id="edit-price" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Stok</label><input type="number" name="stock" id="edit-stock" class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Ganti Gambar (Opsional)</label><input type="file" name="image" class="form-control" accept="image/*"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="deleteProductModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="index.php" method="post">
-                <div class="modal-header">
-                    <h5 class="modal-title">Konfirmasi Hapus</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="delete_product">
-                    <input type="hidden" name="id" id="delete-id">
-                    <p>Anda yakin ingin menghapus produk <strong id="delete-product-name"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-danger">Ya, Hapus</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<?php return ob_get_clean(); }
-
-function view_riwayat($order_obj) {
-    $start_date = $_GET['start_date'] ?? date('Y-m-d');
-    $end_date = $_GET['end_date'] ?? date('Y-m-d');
-    ob_start();
-?>
-<h2 class="mb-4">Riwayat Pesanan</h2>
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-        <form class="row g-3 align-items-end" method="GET">
-            <input type="hidden" name="page" value="riwayat">
-            <div class="col-md-5"><label class="form-label">Dari Tanggal</label><input type="date" name="start_date" class="form-control" value="<?php echo $start_date; ?>"></div>
-            <div class="col-md-5"><label class="form-label">Sampai Tanggal</label><input type="date" name="end_date" class="form-control" value="<?php echo $end_date; ?>"></div>
-            <div class="col-md-2 d-grid"><button type="submit" class="btn btn-primary"><i class="bi bi-funnel-fill me-2"></i>Filter</button></div>
-        </form>
-    </div>
-</div>
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>No. Invoice</th>
-                        <th>Tanggal</th>
-                        <th>Kasir</th>
-                        <th>Total</th>
-                        <th class="text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $history = $order_obj->getHistory($start_date, $end_date);
-                    if ($history->rowCount() > 0) {
-                        while ($row = $history->fetch(PDO::FETCH_ASSOC)) {
-                            extract($row);
-                    ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($invoice_number); ?></td>
-                        <td><?php echo date('d M Y, H:i', strtotime($order_date)); ?></td>
-                        <td><?php echo htmlspecialchars($username); ?></td>
-                        <td>Rp <?php echo number_format($total_amount, 0, ',', '.'); ?></td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-info" onclick="showHistoryDetail(<?php echo $id; ?>)"><i class="bi bi-receipt"></i> Detail</button>
-                        </td>
-                    </tr>
-                    <?php } } else { ?>
-                        <tr><td colspan="5" class="text-center text-muted">Tidak ada data untuk rentang tanggal ini.</td></tr>
-                    <?php } ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-<?php return ob_get_clean(); }
-
-function view_statistik($order_obj) {
-    $stats = $order_obj->getDailyStats();
-    ob_start();
-?>
-<h2 class="mb-4">Statistik Penjualan Hari Ini (<?php echo date('d F Y'); ?>)</h2>
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card text-white bg-success shadow-lg">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title">TOTAL PENDAPATAN</h5>
-                        <h3 class="display-6 fw-bold">Rp <?php echo number_format($stats['revenue'], 0, ',', '.'); ?></h3>
-                    </div>
-                    <i class="bi bi-cash-stack" style="font-size: 4rem; opacity: 0.3;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 mb-4">
-        <div class="card text-white bg-info shadow-lg">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title">JUMLAH TRANSAKSI</h5>
-                        <h3 class="display-6 fw-bold"><?php echo $stats['transactions']; ?></h3>
-                    </div>
-                    <i class="bi bi-cart-check-fill" style="font-size: 4rem; opacity: 0.3;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<?php return ob_get_clean(); }
-
-function view_receipt_content($order_obj, $order_id) {
-    $detail = $order_obj->getOrderDetails($order_id);
-    $info = $detail['info'];
-    $items = $detail['items'];
-    ob_start();
-?>
-<div class="print-area">
-    <div class="text-center mb-3">
-        <h4>Toko Sejahtera Makmur</h4>
-        <p class="mb-0 small">Jl. Pahlawan No. 123, Semarang</p>
-        <hr class="my-2">
-    </div>
-    <p class="mb-0 small">No: <?php echo htmlspecialchars($info['invoice_number']); ?></p>
-    <p class="small">Tgl: <?php echo date('d/m/Y H:i', strtotime($info['order_date'])); ?></p>
-    <table class="table table-sm">
-        <tbody>
-            <?php foreach ($items as $item): ?>
-            <tr>
-                <td><?php echo htmlspecialchars($item['name']); ?><br><small><?php echo $item['quantity']; ?> x <?php echo number_format($item['price_per_item']); ?></small></td>
-                <td class="text-end align-middle">Rp <?php echo number_format($item['quantity'] * $item['price_per_item'], 0, ',', '.'); ?></td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-        <tfoot>
-            <tr class="border-top">
-                <th class="text-end">Total</th>
-                <th class="text-end">Rp <?php echo number_format($info['total_amount'], 0, ',', '.'); ?></th>
-            </tr>
-        </tfoot>
-    </table>
-    <div class="text-center mt-3 small">
-        <p>Terima kasih telah berbelanja!</p>
-    </div>
-</div>
-<?php
-    return ob_get_clean();
-}
-
-
-// ===================================================================
-// 4. INISIALISASI OBJEK DAN PENANGANAN REQUEST (CONTROLLER)
-// ===================================================================
+// Inisialisasi objek database dan model
 $database = new Database();
 $db = $database->getConnection();
 
@@ -706,10 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // --- AJAX handler untuk detail/struk ---
 if (isset($_GET['ajax']) && $_GET['page'] === 'riwayat' && isset($_GET['detail_id'])) {
-    echo view_receipt_content($order, $_GET['detail_id']);
+    echo View::receipt_content($order, $_GET['detail_id']);
     exit(); // Hentikan eksekusi skrip setelah mengirim data AJAX
 }
-
 
 // --- Routing Halaman (GET Request) ---
 $page = $_GET['page'] ?? (isset($_SESSION['user_id']) ? 'home' : 'login');
@@ -731,12 +140,12 @@ if ($page === 'logout') {
 // Menyiapkan konten untuk dirender
 $content = '';
 switch ($page) {
-    case 'login': $content = view_login(); break;
-    case 'register': $content = view_register(); break;
-    case 'home': $content = view_home($product); break;
-    case 'produk': $content = view_produk($product); break;
-    case 'riwayat': $content = view_riwayat($order); break;
-    case 'statistik': $content = view_statistik($order); break;
+    case 'login': $content = View::login(); break;
+    case 'register': $content = View::register(); break;
+    case 'home': $content = View::home($product); break;
+    case 'produk': $content = View::produk($product); break;
+    case 'riwayat': $content = View::riwayat($order); break;
+    case 'statistik': $content = View::statistik($order); break;
     default: $content = "<div class='alert alert-danger'>Halaman tidak ditemukan.</div>"; break;
 }
 
@@ -955,35 +364,192 @@ switch ($page) {
         };
         
         document.getElementById('btn-clear-cart').addEventListener('click', () => {
-            if(confirm('Anda yakin ingin mengosongkan keranjang?')) {
-                cart = [];
-                updateCartView();
-            }
+
+            // Floating confirmation for clear cart
+            showFloatingConfirm({
+                message: 'Anda yakin ingin mengosongkan keranjang?',
+                confirmText: 'Ya, Kosongkan',
+                cancelText: 'Batal',
+                onConfirm: () => {
+                    cart = [];
+                    updateCartView();
+                }
+            });
         });
 
         document.getElementById('btn-checkout').addEventListener('click', () => {
             const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            if(confirm(`Total pembayaran adalah ${formatRupiah(total)}. Lanjutkan?`)){
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'index.php';
-                form.innerHTML = `
-                    <input type="hidden" name="action" value="process_order">
-                    <input type="hidden" name="cart_data" value='${JSON.stringify(cart)}'>
-                    <input type="hidden" name="total_amount" value="${total}">
-                `;
-                document.body.appendChild(form);
-                form.submit();
-            }
+            showFloatingConfirm({
+                message: `Total pembayaran adalah ${formatRupiah(total)}. Lanjutkan?`,
+                confirmText: 'Lanjut Pembayaran',
+                cancelText: 'Batal',
+                onConfirm: () => {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = 'index.php';
+                    form.innerHTML = `
+                        <input type="hidden" name="action" value="process_order">
+                        <input type="hidden" name="cart_data" value='${JSON.stringify(cart)}'>
+                        <input type="hidden" name="total_amount" value="${total}">
+                    `;
+                    document.body.appendChild(form);
+                    form.submit();
+                    cart = [];
+                    updateCartView();
+                }
+            });
         });
+
+        // Floating confirm dialog
+        function showFloatingConfirm({ message, confirmText = 'OK', cancelText = 'Batal', onConfirm }) {
+            let dialog = document.getElementById('floating-confirm-dialog');
+            if (!dialog) {
+                dialog = document.createElement('div');
+                dialog.id = 'floating-confirm-dialog';
+                dialog.innerHTML = `
+                    <div class="floating-confirm-backdrop"></div>
+                    <div class="floating-confirm-box">
+                        <div class="floating-confirm-message"></div>
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            <button class="btn btn-secondary btn-cancel"></button>
+                            <button class="btn btn-primary btn-confirm"></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(dialog);
+            }
+            dialog.querySelector('.floating-confirm-message').innerHTML = message;
+            dialog.querySelector('.btn-confirm').textContent = confirmText;
+            dialog.querySelector('.btn-cancel').textContent = cancelText;
+            dialog.style.display = 'flex';
+            dialog.classList.add('show');
+            // Remove previous listeners
+            const newConfirm = dialog.querySelector('.btn-confirm').cloneNode(true);
+            const newCancel = dialog.querySelector('.btn-cancel').cloneNode(true);
+            dialog.querySelector('.btn-confirm').replaceWith(newConfirm);
+            dialog.querySelector('.btn-cancel').replaceWith(newCancel);
+            newConfirm.addEventListener('click', () => {
+                dialog.style.display = 'none';
+                dialog.classList.remove('show');
+                if (onConfirm) onConfirm();
+            });
+            newCancel.addEventListener('click', () => {
+                dialog.style.display = 'none';
+                dialog.classList.remove('show');
+            });
+        }
+
+        // Floating confirm dialog styles
+        if (!document.getElementById('floating-confirm-style')) {
+            const style = document.createElement('style');
+            style.id = 'floating-confirm-style';
+            style.innerHTML = `
+                #floating-confirm-dialog {
+                    position: fixed; z-index: 2000; left: 0; top: 0; width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center;
+                }
+                #floating-confirm-dialog.show { display: flex; }
+                .floating-confirm-backdrop {
+                    position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); z-index: 1;
+                }
+                .floating-confirm-box {
+                    position: relative; z-index: 2; background: #fff; border-radius: 1rem; box-shadow: 0 4px 32px rgba(0,0,0,0.15); padding: 2rem; min-width: 320px; max-width: 90vw;
+                    animation: popin .2s cubic-bezier(.4,2,.6,1) 1;
+                }
+                @keyframes popin { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            `;
+            document.head.appendChild(style);
+        }
         
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('status') === 'success' && <?php echo isset($_SESSION['last_order_id']) ? 'true' : 'false'; ?>) {
             const orderId = <?php echo $_SESSION['last_order_id'] ?? 0; ?>;
             if(orderId > 0) {
-                showHistoryDetail(orderId);
+                // Show custom success dialog with struk
+                fetch(`index.php?page=riwayat&ajax=1&detail_id=${orderId}`)
+                    .then(response => response.text())
+                    .then(data => {
+                        showOrderSuccessDialog(data);
+                    });
             }
             <?php unset($_SESSION['last_order_id']); ?>
+        }
+
+        function showOrderSuccessDialog(receiptHtml) {
+            let dialog = document.getElementById('order-success-dialog');
+            if (!dialog) {
+                dialog = document.createElement('div');
+                dialog.id = 'order-success-dialog';
+                dialog.innerHTML = `
+                    <div class="floating-confirm-backdrop"></div>
+                    <div class="floating-confirm-box order-success-box text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size:2.5rem;"></i>
+                        </div>
+                        <h5 class="mb-2">Pembayaran Berhasil!</h5>
+                        <div class="mb-3">Berikut adalah struk pesanan Anda:</div>
+                        <div class="mb-3 border rounded p-2 bg-light order-success-struk-wrap">
+                            <div id="order-success-struk"></div>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-center mt-3">
+                            <button class="btn btn-secondary btn-close-success">Tutup</button>
+                            <button class="btn btn-primary btn-print-success"><i class="bi bi-printer"></i> Cetak Struk</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(dialog);
+            }
+            dialog.querySelector('#order-success-struk').innerHTML = receiptHtml;
+            dialog.style.display = 'flex';
+            dialog.classList.add('show');
+            // Remove previous listeners
+            const newClose = dialog.querySelector('.btn-close-success').cloneNode(true);
+            const newPrint = dialog.querySelector('.btn-print-success').cloneNode(true);
+            dialog.querySelector('.btn-close-success').replaceWith(newClose);
+            dialog.querySelector('.btn-print-success').replaceWith(newPrint);
+            newClose.addEventListener('click', () => {
+                dialog.style.display = 'none';
+                dialog.classList.remove('show');
+            });
+            newPrint.addEventListener('click', () => {
+                const printContent = dialog.querySelector('#order-success-struk').innerHTML;
+                const printWindow = window.open('', '', 'height=600,width=400');
+                printWindow.document.write('<html><head><title>Cetak Struk</title>');
+                printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">');
+                printWindow.document.write('<style> body { font-family: monospace; width: 300px; margin: auto; } .table { font-size: 12px; } </style>');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(printContent);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                setTimeout(() => { 
+                    printWindow.print();
+                    printWindow.close();
+                }, 250);
+            });
+            // Add/Update style for better centering and responsive
+            if (!document.getElementById('order-success-style')) {
+                const style = document.createElement('style');
+                style.id = 'order-success-style';
+                style.innerHTML = `
+                    #order-success-dialog {
+                        position: fixed; z-index: 2100; left: 0; top: 0; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;
+                    }
+                    #order-success-dialog .floating-confirm-backdrop {
+                        position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.35); z-index: 1;
+                    }
+                    #order-success-dialog .order-success-box {
+                        position: relative; z-index: 2; background: #fff; border-radius: 1.25rem; box-shadow: 0 8px 40px rgba(0,0,0,0.18); padding: 2.5rem 2rem 2rem 2rem; min-width: 340px; max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        animation: popin .22s cubic-bezier(.4,2,.6,1) 1;
+                    }
+                    #order-success-dialog .order-success-struk-wrap {
+                        width: 100%; max-width: 320px; margin-left: auto; margin-right: auto; background: #f8f9fa;
+                    }
+                    @media (max-width: 480px) {
+                        #order-success-dialog .order-success-box { min-width: 90vw; padding: 1.2rem 0.5rem; }
+                        #order-success-dialog .order-success-struk-wrap { max-width: 95vw; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
         }
 
         window.showHistoryDetail = (orderId) => {
