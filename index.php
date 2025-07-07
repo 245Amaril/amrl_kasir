@@ -89,7 +89,8 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' &
         case 'add_product':
             if ($_SESSION['role'] === 'admin') {
                 $image_name = handle_image_upload('image');
-                if ($product->create($_POST['name'], $_POST['price'], $_POST['stock'], $image_name)) {
+                $kategori = $_POST['kategori'] ?? '';
+                if ($product->create($_POST['name'], $_POST['price'], $_POST['stock'], $image_name, $kategori)) {
                     $_SESSION['success'] = "Produk berhasil ditambahkan.";
                 } else {
                      $_SESSION['error'] = "Gagal menambahkan produk.";
@@ -101,7 +102,8 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' &
         case 'edit_product':
             if ($_SESSION['role'] === 'admin') {
                 $image_name = handle_image_upload('image', $_POST['current_image']);
-                if ($product->update($_POST['id'], $_POST['name'], $_POST['price'], $_POST['stock'], $image_name)) {
+                $kategori = $_POST['kategori'] ?? '';
+                if ($product->update($_POST['id'], $_POST['name'], $_POST['price'], $_POST['stock'], $image_name, $kategori)) {
                     $_SESSION['success'] = "Produk berhasil diperbarui.";
                 } else {
                     $_SESSION['error'] = "Gagal memperbarui produk.";

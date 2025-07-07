@@ -116,6 +116,7 @@ class View {
                     <img src="<?php echo $image_path; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($name); ?>">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title flex-grow-1"><?php echo htmlspecialchars($name); ?></h5>
+                        <p class="card-text mb-1"><span class="badge bg-info text-dark"><?php echo htmlspecialchars($kategori ?? '-'); ?></span></p>
                         <p class="card-text text-primary fw-bold fs-5 mb-2">Rp <?php echo number_format($price, 0, ',', '.'); ?></p>
                         <p class="card-text"><small class="text-muted">Stok: <span class="fw-bold <?php echo $stock > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $stock; ?></span></small></p>
                     </div>
@@ -149,6 +150,7 @@ class View {
                             <tr>
                                 <th>Gambar</th>
                                 <th>Nama Produk</th>
+                                <th>Kategori</th>
                                 <th>Harga</th>
                                 <th>Stok</th>
                                 <th class="text-center">Aksi</th>
@@ -164,6 +166,7 @@ class View {
                             <tr>
                                 <td><img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($name); ?>" style="width: 60px; height: 60px; object-fit: cover;" class="rounded-3"></td>
                                 <td class="fw-bold"><?php echo htmlspecialchars($name); ?></td>
+                                <td><span class="badge bg-info text-dark"><?php echo htmlspecialchars($kategori ?? '-'); ?></span></td>
                                 <td>Rp <?php echo number_format($price, 0, ',', '.'); ?></td>
                                 <td><?php echo $stock; ?></td>
                                 <td class="text-center">
@@ -172,7 +175,8 @@ class View {
                                         data-bs-name="<?php echo htmlspecialchars($name); ?>"
                                         data-bs-price="<?php echo $price; ?>"
                                         data-bs-stock="<?php echo $stock; ?>"
-                                        data-bs-image="<?php echo $image; ?>">
+                                        data-bs-image="<?php echo $image; ?>"
+                                        data-bs-kategori="<?php echo htmlspecialchars($kategori ?? ''); ?>">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
                                     <form action="index.php" method="post" class="d-inline move-to-trash-form">
@@ -203,6 +207,10 @@ class View {
                             <div class="mb-3">
                                 <label for="add-name" class="form-label">Nama Produk</label>
                                 <input type="text" class="form-control" id="add-name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add-kategori" class="form-label">Kategori</label>
+                                <input type="text" class="form-control" id="add-kategori" name="kategori" required placeholder="Contoh: Minuman, Makanan, dll">
                             </div>
                             <div class="mb-3">
                                 <label for="add-price" class="form-label">Harga</label>
@@ -242,6 +250,10 @@ class View {
                             <div class="mb-3">
                                 <label for="edit-name" class="form-label">Nama Produk</label>
                                 <input type="text" class="form-control" id="edit-name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit-kategori" class="form-label">Kategori</label>
+                                <input type="text" class="form-control" id="edit-kategori" name="kategori" required placeholder="Contoh: Minuman, Makanan, dll">
                             </div>
                             <div class="mb-3">
                                 <label for="edit-price" class="form-label">Harga</label>
@@ -397,6 +409,15 @@ class View {
                     var name = button.getAttribute('data-name');
                     deletePermanentModal.querySelector('#delete-permanent-id').value = id;
                     deletePermanentModal.querySelector('#delete-permanent-name').textContent = name;
+                });
+            }
+            // Isi otomatis kategori pada edit modal
+            var editProductModal = document.getElementById('editProductModal');
+            if(editProductModal){
+                editProductModal.addEventListener('show.bs.modal', function(event) {
+                    var button = event.relatedTarget;
+                    var kategori = button.getAttribute('data-bs-kategori');
+                    editProductModal.querySelector('#edit-kategori').value = kategori || '';
                 });
             }
         });

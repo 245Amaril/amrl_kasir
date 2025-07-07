@@ -116,7 +116,7 @@ class Product {
     }
 
     public function readAll() {
-        $query = "SELECT id, name, price, stock, image FROM " . $this->table_name . " WHERE deleted_at IS NULL ORDER BY name ASC";
+        $query = "SELECT id, name, price, stock, image, kategori FROM " . $this->table_name . " WHERE deleted_at IS NULL ORDER BY name ASC";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         return $stmt;
@@ -133,24 +133,26 @@ class Product {
 
 // AdminProduct: bisa CRUD, restore, trash, deletePermanent
 class AdminProduct extends Product {
-    public function create($name, $price, $stock, $image) {
-        $query = "INSERT INTO " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image";
+    public function create($name, $price, $stock, $image, $kategori) {
+        $query = "INSERT INTO " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image, kategori=:kategori";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':name', $name);
         $stmt->bindParam(':price', $price);
         $stmt->bindParam(':stock', $stock);
         $stmt->bindParam(':image', $image);
+        $stmt->bindParam(':kategori', $kategori);
         return $stmt->execute();
     }
 
-    public function update($id, $name, $price, $stock, $image) {
-        $query = "UPDATE " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image WHERE id=:id";
+    public function update($id, $name, $price, $stock, $image, $kategori) {
+        $query = "UPDATE " . $this->table_name . " SET name=:name, price=:price, stock=:stock, image=:image, kategori=:kategori WHERE id=:id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
         $stmt->bindParam(':name', $name);
         $stmt->bindParam(':price', $price);
         $stmt->bindParam(':stock', $stock);
         $stmt->bindParam(':image', $image);
+        $stmt->bindParam(':kategori', $kategori);
         return $stmt->execute();
     }
 
