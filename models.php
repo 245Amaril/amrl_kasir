@@ -214,6 +214,7 @@ class Order {
     public function create($userId, $totalAmount, $cart) {
         $this->conn->beginTransaction();
         try {
+            date_default_timezone_set('Asia/Jakarta');
             $invoice_number = 'INV-' . date('Ymd') . '-' . strtoupper(uniqid());
             $order_query = "INSERT INTO orders (invoice_number, user_id, total_amount) VALUES (?, ?, ?)";
             $stmt = $this->conn->prepare($order_query);
@@ -267,6 +268,7 @@ class Order {
     }
 
     public function getDailyStats() {
+        date_default_timezone_set('Asia/Jakarta');
         $today = date('Y-m-d');
         $stats = [];
         $query_revenue = "SELECT SUM(total_amount) as total_revenue FROM orders WHERE DATE(order_date) = ?";

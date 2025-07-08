@@ -154,7 +154,10 @@ class View {
         </div>
     <?php return ob_get_clean(); }
 
-    public static function produk($product_obj) { ob_start(); ?>
+    public static function produk($product_obj) {
+            date_default_timezone_set('Asia/Jakarta');
+            ob_start();
+        ?>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Manajemen Produk</h2>
             <div>
@@ -446,128 +449,131 @@ class View {
     <?php return ob_get_clean(); }
 
     public static function riwayat($order_obj) {
-        $start_date = $_GET['start_date'] ?? date('Y-m-d');
-        $end_date = $_GET['end_date'] ?? date('Y-m-d');
-        ob_start();
-    ?>
-    <h2 class="mb-4">Riwayat Pesanan</h2>
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <form class="row g-3 align-items-end" method="GET">
-                <input type="hidden" name="page" value="riwayat">
-                <div class="col-md-5"><label class="form-label">Dari Tanggal</label><input type="date" name="start_date" class="form-control" value="<?php echo $start_date; ?>"></div>
-                <div class="col-md-5"><label class="form-label">Sampai Tanggal</label><input type="date" name="end_date" class="form-control" value="<?php echo $end_date; ?>"></div>
-                <div class="col-md-2 d-grid"><button type="submit" class="btn btn-primary"><i class="bi bi-funnel-fill me-2"></i>Filter</button></div>
-            </form>
-        </div>
-    </div>
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>No. Invoice</th>
-                            <th>Tanggal</th>
-                            <th>Kasir</th>
-                            <th>Total</th>
-                            <th class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $history = $order_obj->getHistory($start_date, $end_date);
-                        if ($history->rowCount() > 0) {
-                            while ($row = $history->fetch(PDO::FETCH_ASSOC)) {
-                                extract($row);
-                        ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($invoice_number); ?></td>
-                            <td><?php echo date('d M Y, H:i', strtotime($order_date)); ?></td>
-                            <td><?php echo htmlspecialchars($username); ?></td>
-                            <td>Rp <?php echo number_format($total_amount, 0, ',', '.'); ?></td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-info" onclick="showHistoryDetail(<?php echo $id; ?>)"><i class="bi bi-receipt"></i> Detail</button>
-                            </td>
-                        </tr>
-                        <?php } } else { ?>
-                            <tr><td colspan="5" class="text-center text-muted">Tidak ada data untuk rentang tanggal ini.</td></tr>
-                        <?php } ?>
-                    </tbody>
-                </table>
+            date_default_timezone_set('Asia/Jakarta');
+            $start_date = $_GET['start_date'] ?? date('Y-m-d');
+            $end_date = $_GET['end_date'] ?? date('Y-m-d');
+            ob_start();
+        ?>
+        <h2 class="mb-4">Riwayat Pesanan</h2>
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <form class="row g-3 align-items-end" method="GET">
+                    <input type="hidden" name="page" value="riwayat">
+                    <div class="col-md-5"><label class="form-label">Dari Tanggal</label><input type="date" name="start_date" class="form-control" value="<?php echo $start_date; ?>"></div>
+                    <div class="col-md-5"><label class="form-label">Sampai Tanggal</label><input type="date" name="end_date" class="form-control" value="<?php echo $end_date; ?>"></div>
+                    <div class="col-md-2 d-grid"><button type="submit" class="btn btn-primary"><i class="bi bi-funnel-fill me-2"></i>Filter</button></div>
+                </form>
             </div>
         </div>
-    </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>No. Invoice</th>
+                                <th>Tanggal</th>
+                                <th>Kasir</th>
+                                <th>Total</th>
+                                <th class="text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $history = $order_obj->getHistory($start_date, $end_date);
+                            if ($history->rowCount() > 0) {
+                                while ($row = $history->fetch(PDO::FETCH_ASSOC)) {
+                                    extract($row);
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($invoice_number); ?></td>
+                                <td><?php echo date('d M Y, H:i', strtotime($order_date)); ?></td>
+                                <td><?php echo htmlspecialchars($username); ?></td>
+                                <td>Rp <?php echo number_format($total_amount, 0, ',', '.'); ?></td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-info" onclick="showHistoryDetail(<?php echo $id; ?>)"><i class="bi bi-receipt"></i> Detail</button>
+                                </td>
+                            </tr>
+                            <?php } } else { ?>
+                                <tr><td colspan="5" class="text-center text-muted">Tidak ada data untuk rentang tanggal ini.</td></tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     <?php return ob_get_clean(); }
 
     public static function statistik($order_obj) {
-        $stats = $order_obj->getDailyStats();
-        ob_start();
-    ?>
-    <h2 class="mb-4">Statistik Penjualan Hari Ini (<?php echo date('d F Y'); ?>)</h2>
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card text-white bg-success shadow-lg">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="card-title">TOTAL PENDAPATAN</h5>
-                            <h3 class="display-6 fw-bold">Rp <?php echo number_format($stats['revenue'], 0, ',', '.'); ?></h3>
+            date_default_timezone_set('Asia/Jakarta');
+            $stats = $order_obj->getDailyStats();
+            ob_start();
+        ?>
+        <h2 class="mb-4">Statistik Penjualan Hari Ini (<?php echo date('d F Y'); ?>)</h2>
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card text-white bg-success shadow-lg">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">TOTAL PENDAPATAN</h5>
+                                <h3 class="display-6 fw-bold">Rp <?php echo number_format($stats['revenue'], 0, ',', '.'); ?></h3>
+                            </div>
+                            <i class="bi bi-cash-stack" style="font-size: 4rem; opacity: 0.3;"></i>
                         </div>
-                        <i class="bi bi-cash-stack" style="font-size: 4rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card text-white bg-info shadow-lg">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">JUMLAH TRANSAKSI</h5>
+                                <h3 class="display-6 fw-bold"><?php echo $stats['transactions']; ?></h3>
+                            </div>
+                            <i class="bi bi-cart-check-fill" style="font-size: 4rem; opacity: 0.3;"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6 mb-4">
-            <div class="card text-white bg-info shadow-lg">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="card-title">JUMLAH TRANSAKSI</h5>
-                            <h3 class="display-6 fw-bold"><?php echo $stats['transactions']; ?></h3>
-                        </div>
-                        <i class="bi bi-cart-check-fill" style="font-size: 4rem; opacity: 0.3;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <?php return ob_get_clean(); }
 
     public static function receipt_content($order_obj, $order_id) {
-        $detail = $order_obj->getOrderDetails($order_id);
-        $order = $detail['info'];
-        $items = $detail['items'];
-        ob_start();
-    ?>
-    <div class="print-area">
-        <div class="text-center mb-3">
-            <h4>Kedai Biasane</h4>
-            <p class="mb-0 small">Jl. Awan, Jebres, Kec. Jebres, Kota Surakarta</p>
-            <hr class="my-2">
+            date_default_timezone_set('Asia/Jakarta');
+            $detail = $order_obj->getOrderDetails($order_id);
+            $order = $detail['info'];
+            $items = $detail['items'];
+            ob_start();
+        ?>
+        <div class="print-area">
+            <div class="text-center mb-3">
+                <h4>Kedai Biasane</h4>
+                <p class="mb-0 small">Jl. Awan, Jebres, Kec. Jebres, Kota Surakarta</p>
+                <hr class="my-2">
+            </div>
+            <p class="mb-0 small">No: <?php echo htmlspecialchars($order['invoice_number']); ?></p>
+            <p class="small">Tgl: <?php echo date('d/m/Y H:i', strtotime($order['order_date'])); ?></p>
+            <table class="table table-sm">
+                <tbody>
+                    <?php foreach ($items as $item): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($item['name']); ?><br><small><?php echo $item['quantity']; ?> x <?php echo number_format($item['price_per_item']); ?></small></td>
+                        <td class="text-end align-middle">Rp <?php echo number_format($item['quantity'] * $item['price_per_item'], 0, ',', '.'); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr class="border-top">
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Rp <?php echo number_format($order['total_amount'], 0, ',', '.'); ?></th>
+                    </tr>
+                </tfoot>
+            </table>
+            <div class="text-center mt-3 small">
+                <p>Terima kasih telah berbelanja!</p>
+            </div>
         </div>
-        <p class="mb-0 small">No: <?php echo htmlspecialchars($order['invoice_number']); ?></p>
-        <p class="small">Tgl: <?php echo date('d/m/Y H:i', strtotime($order['order_date'])); ?></p>
-        <table class="table table-sm">
-            <tbody>
-                <?php foreach ($items as $item): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($item['name']); ?><br><small><?php echo $item['quantity']; ?> x <?php echo number_format($item['price_per_item']); ?></small></td>
-                    <td class="text-end align-middle">Rp <?php echo number_format($item['quantity'] * $item['price_per_item'], 0, ',', '.'); ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr class="border-top">
-                    <th class="text-end">Total</th>
-                    <th class="text-end">Rp <?php echo number_format($order['total_amount'], 0, ',', '.'); ?></th>
-                </tr>
-            </tfoot>
-        </table>
-        <div class="text-center mt-3 small">
-            <p>Terima kasih telah berbelanja!</p>
-        </div>
-    </div>
     <?php return ob_get_clean(); }
 }
