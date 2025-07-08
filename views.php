@@ -104,32 +104,53 @@ class View {
 
     public static function home($product_obj) { ob_start(); ?>
         <h2 class="mb-4">Daftar Produk</h2>
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-            <?php
-            $products = $product_obj->readAll();
-            while ($row = $products->fetch(PDO::FETCH_ASSOC)) {
-                extract($row);
-                $image_path = !empty($image) && file_exists('uploads/' . $image) ? 'uploads/' . $image : 'https://placehold.co/400x300/E9ECEF/6C757D?text=Gambar+Produk';
-            ?>
-            <div class="col">
-                <div class="card h-100 product-card shadow-sm border-0">
-                    <img src="<?php echo $image_path; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($name); ?>">
-                    <div class="card-body d-flex flex-column">
-                        <h5 class="card-title flex-grow-1"><?php echo htmlspecialchars($name); ?></h5>
-                        <p class="card-text mb-1"><span class="badge bg-info text-dark"><?php echo htmlspecialchars($kategori ?? '-'); ?></span></p>
-                        <p class="card-text text-primary fw-bold fs-5 mb-2">Rp <?php echo number_format($price, 0, ',', '.'); ?></p>
-                        <p class="card-text"><small class="text-muted">Stok: <span class="fw-bold <?php echo $stock > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $stock; ?></span></small></p>
-                    </div>
-                    <div class="card-footer bg-white border-0 p-3">
-                        <div class="d-grid">
-                            <button class="btn btn-primary" onclick="addToCart(<?php echo $id; ?>, '<?php echo htmlspecialchars(addslashes($name)); ?>', <?php echo $price; ?>, <?php echo $stock; ?>, '<?php echo $image_path; ?>')" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
-                                <i class="bi bi-cart-plus-fill me-2"></i> <?php echo $stock <= 0 ? 'Stok Habis' : 'Tambah'; ?>
-                            </button>
+        <?php
+        // Ambil semua produk dan kelompokkan per kategori
+        $products = $product_obj->readAll();
+        $kategori_map = [];
+        while ($row = $products->fetch(PDO::FETCH_ASSOC)) {
+            $kat = $row['kategori'] ?? '-';
+            if (!isset($kategori_map[$kat])) $kategori_map[$kat] = [];
+            $kategori_map[$kat][] = $row;
+        }
+        ?>
+        <div class="accordion" id="kategoriAccordion">
+        <?php $idx = 0; foreach ($kategori_map as $kat => $produkList): ?>
+            <div class="accordion-item mb-3">
+                <h2 class="accordion-header" id="heading<?php echo $idx; ?>">
+                    <button class="accordion-button<?php echo $idx > 0 ? ' collapsed' : ''; ?>" type="button" data-bs-toggle="collapse" data-bs-target="#collapse<?php echo $idx; ?>" aria-expanded="<?php echo $idx === 0 ? 'true' : 'false'; ?>" aria-controls="collapse<?php echo $idx; ?>">
+                        <?php echo htmlspecialchars($kat); ?>
+                    </button>
+                </h2>
+                <div id="collapse<?php echo $idx; ?>" class="accordion-collapse collapse<?php echo $idx === 0 ? ' show' : ''; ?>" aria-labelledby="heading<?php echo $idx; ?>" data-bs-parent="#kategoriAccordion">
+                    <div class="accordion-body">
+                        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+                        <?php foreach ($produkList as $row):
+                            $image_path = !empty($row['image']) && file_exists('uploads/' . $row['image']) ? 'uploads/' . $row['image'] : 'https://placehold.co/400x300/E9ECEF/6C757D?text=Gambar+Produk';
+                        ?>
+                        <div class="col">
+                            <div class="card h-100 product-card shadow-sm border-0">
+                                <img src="<?php echo $image_path; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($row['name']); ?>">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title flex-grow-1"><?php echo htmlspecialchars($row['name']); ?></h5>
+                                    <p class="card-text text-primary fw-bold fs-5 mb-2">Rp <?php echo number_format($row['price'], 0, ',', '.'); ?></p>
+                                    <p class="card-text"><small class="text-muted">Stok: <span class="fw-bold <?php echo $row['stock'] > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $row['stock']; ?></span></small></p>
+                                </div>
+                                <div class="card-footer bg-white border-0 p-3">
+                                    <div class="d-grid">
+                                        <button class="btn btn-primary" onclick="addToCart(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars(addslashes($row['name'])); ?>', <?php echo $row['price']; ?>, <?php echo $row['stock']; ?>, '<?php echo $image_path; ?>')" <?php echo $row['stock'] <= 0 ? 'disabled' : ''; ?>>
+                                            <i class="bi bi-cart-plus-fill me-2"></i> <?php echo $row['stock'] <= 0 ? 'Stok Habis' : 'Tambah'; ?>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
             </div>
-            <?php } ?>
+        <?php $idx++; endforeach; ?>
         </div>
     <?php return ob_get_clean(); }
 
